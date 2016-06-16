@@ -227,5 +227,8 @@ func main() {
 		l,
 	)
 
+	server.SetHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+	server.SetHeader("Access-Control-Allow-Origin", "*")
+
 	errLogger.Fatal(server.Start(":"+port, false))
 }

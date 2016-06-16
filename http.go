@@ -41,13 +41,6 @@ func router(r *http.Request, l *log.Logger) (simplehttp.HandleFunc, int) {
 	return nil, 0
 }
 
-func addCORSHeaders(w http.ResponseWriter) {
-	header := w.Header()
-
-	header.Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-	header.Set("Access-Control-Allow-Origin", "*")
-}
-
 func serveHelp(w http.ResponseWriter, r *http.Request, l *log.Logger) (errStatus int, err error) {
 	w.Header().Set("Content-Type", "text/plain")
 	fmt.Fprint(w, `
@@ -68,28 +61,7 @@ POST /bounded
 }
 
 func serveOption(w http.ResponseWriter, r *http.Request, l *log.Logger) (errStatus int, err error) {
-	addCORSHeaders(w)
 	return
-}
-
-func getBound(r *http.Request, index int) (*image.Rectangle, error) {
-	raw := strings.Split(r.FormValue(fmt.Sprintf("b%d", index)), ",")
-	if len(raw) != 4 {
-		return nil, errors.New("Invalid rectangle spec")
-	}
-
-	var ints [4]int
-	for i := range raw {
-		integ, err := strconv.Atoi(raw[i])
-		if err != nil {
-			return nil, err
-		}
-
-		ints[i] = integ
-	}
-
-	rect := image.Rect(ints[0], ints[1], ints[2], ints[3])
-	return &rect, nil
 }
 
 func serveBounded(w http.ResponseWriter, r *http.Request, l *log.Logger) (errStatus int, herr error) {
@@ -217,4 +189,24 @@ func getFormFloat(r *http.Request, key string, fallback float64) float64 {
 	}
 
 	return intVal
+}
+
+func getBound(r *http.Request, index int) (*image.Rectangle, error) {
+	raw := strings.Split(r.FormValue(fmt.Sprintf("b%d", index)), ",")
+	if len(raw) != 4 {
+		return nil, errors.New("Invalid rectangle spec")
+	}
+
+	var ints [4]int
+	for i := range raw {
+		integ, err := strconv.Atoi(raw[i])
+		if err != nil {
+			return nil, err
+		}
+
+		ints[i] = integ
+	}
+
+	rect := image.Rect(ints[0], ints[1], ints[2], ints[3])
+	return &rect, nil
 }
