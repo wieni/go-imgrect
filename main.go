@@ -30,18 +30,104 @@ func init() {
 	errLogger = log.New(os.Stderr, "", log.LstdFlags)
 }
 
-func rects(
+// PercentPoint contains both X, Y and %X, %Y
+type PercentPoint struct {
+	X        int     `json:"x"`
+	Y        int     `json:"y"`
+	PercentX float64 `json:"%x"`
+	PercentY float64 `json:"%y"`
+}
+
+// PercentRectangle like image.Rectangle defines a Min and Max point
+type PercentRectangle struct {
+	Min *PercentPoint `json:"min"`
+	Max *PercentPoint `json:"max"`
+}
+
+// toPercentRectangles returns a slice of PercentRectangles
+// Percentage is calculated based on srcWidth and srcHeight
+// new X and Y based on dstWidth and dstHeight
+func toPercentRectangles(
+	r canny.Rectangles,
+	srcWidth,
+	srcHeight,
+	dstWidth,
+	dstHeight int,
+) []*PercentRectangle {
+	rects := make([]*PercentRectangle, len(r))
+	sw := float64(srcWidth)
+	sh := float64(srcHeight)
+
+	for i := range r {
+		minxp := float64(r[i].Min.X) / sw
+		minyp := float64(r[i].Min.Y) / sh
+		maxxp := float64(r[i].Max.X) / sw
+		maxyp := float64(r[i].Max.Y) / sh
+
+		rects[i] = &PercentRectangle{
+			Min: &PercentPoint{
+				int(float64(dstWidth) * minxp),
+				int(float64(dstHeight) * minyp),
+				minxp,
+				minyp,
+			},
+			Max: &PercentPoint{
+				int(float64(dstWidth) * maxxp),
+				int(float64(dstHeight) * maxyp),
+				maxxp,
+				maxyp,
+			},
+		}
+	}
+
+	return rects
+}
+
+type bound struct {
+	Index int     `json:"index"`
+	Score float64 `json:"score"`
+}
+
+type bounds []*bound
+
+func (b bounds) Len() int      { return len(b) }
+func (b bounds) Swap(i, j int) { b[i], b[j] = b[j], b[i] }
+func (b bounds) Less(i, j int) bool {
+	return b[i].Score*b[i].Score < b[j].Score*b[j].Score
+}
+
+func bounded(
+	reader io.Reader,
+	rects []*image.Rectangle,
+) (bounds, error) {
+	imgs, err := canny.LoadBounds(reader, 1024*1024*100, rects)
+	if err != nil {
+		return nil, err
+	}
+
+	scores := make(bounds, len(imgs))
+	for i := range imgs {
+		img := canny.Canny(imgs[i], 3, 3, false)
+		defer img.Release()
+		scores[i] = &bound{i, img.Avg(nil).Val()[0]}
+	}
+
+	sort.Sort(scores)
+	return scores, nil
+}
+
+func weighted(
 	reader io.Reader,
 	amount int,
 	minWidth,
 	minHeight float64,
 	preview io.Writer,
-) ([]*canny.PercentRectangle, error) {
+) ([]*PercentRectangle, error) {
 	if amount < 1 {
 		amount = 1
 	}
 
-	_img, origWidth, origHeight, err := canny.Load(reader, 800)
+	_img, origWidth, origHeight, err := canny.Load(reader, 1024*1024*100, 800)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +170,8 @@ func rects(
 	rects = rects[:amount]
 
 	if preview == nil {
-		return rects.ToPercentRectangles(
+		return toPercentRectangles(
+			rects,
 			width,
 			height,
 			origWidth,
@@ -115,7 +202,8 @@ func rects(
 	}
 
 	jpeg.Encode(preview, goimg, nil)
-	return rects.ToPercentRectangles(
+	return toPercentRectangles(
+		rects,
 		width,
 		height,
 		origWidth,
@@ -132,8 +220,8 @@ func main() {
 	l := log.New(os.Stderr, "http|", 0)
 	server := simplehttp.FromHTTPServer(
 		&http.Server{
-			ReadTimeout:  time.Second * 2,
-			WriteTimeout: time.Second * 5,
+			ReadTimeout:  time.Second * 10,
+			WriteTimeout: time.Second * 10,
 		},
 		router,
 		l,

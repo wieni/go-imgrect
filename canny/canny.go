@@ -2,7 +2,6 @@ package canny
 
 import (
 	"errors"
-	"fmt"
 	"image"
 	"io"
 	"io/ioutil"
@@ -15,60 +14,8 @@ import (
 // by opencv
 var ErrLoadFailed = errors.New("Image failed to load")
 
-// PercentPoint contains both X, Y and %X, %Y
-type PercentPoint struct {
-	X        int     `json:"x"`
-	Y        int     `json:"y"`
-	PercentX float64 `json:"%x"`
-	PercentY float64 `json:"%y"`
-}
-
-// PercentRectangle like image.Rectangle defines a Min and Max point
-type PercentRectangle struct {
-	Min *PercentPoint `json:"min"`
-	Max *PercentPoint `json:"max"`
-}
-
 // Rectangles is a slice of Rectangles
 type Rectangles []*image.Rectangle
-
-// ToPercentRectangles returns a slice of PercentRectangles
-// Percentage is calculated based on srcWidth and srcHeight
-// new X and Y based on dstWidth and dstHeight
-func (r Rectangles) ToPercentRectangles(
-	srcWidth,
-	srcHeight,
-	dstWidth,
-	dstHeight int,
-) []*PercentRectangle {
-	rects := make([]*PercentRectangle, len(r))
-	sw := float64(srcWidth)
-	sh := float64(srcHeight)
-
-	for i := range r {
-		minxp := float64(r[i].Min.X) / sw
-		minyp := float64(r[i].Min.Y) / sh
-		maxxp := float64(r[i].Max.X) / sw
-		maxyp := float64(r[i].Max.Y) / sh
-
-		rects[i] = &PercentRectangle{
-			Min: &PercentPoint{
-				int(float64(dstWidth) * minxp),
-				int(float64(dstHeight) * minyp),
-				minxp,
-				minyp,
-			},
-			Max: &PercentPoint{
-				int(float64(dstWidth) * maxxp),
-				int(float64(dstHeight) * maxyp),
-				maxxp,
-				maxyp,
-			},
-		}
-	}
-
-	return rects
-}
 
 func (r Rectangles) Len() int      { return len(r) }
 func (r Rectangles) Swap(i, j int) { r[i], r[j] = r[j], r[i] }
@@ -191,13 +138,6 @@ func matRects(sum []int, width, minWidth, minHeight int) Rectangles {
 }
 
 func fromByteSlice(data []byte) *opencv.IplImage {
-	defer func() {
-		//recover()
-		if r := recover(); r != nil {
-			fmt.Println("RECOVER")
-		}
-	}()
-
 	// passing an empty slice to CreateMatHeader will fail HARD.
 	if len(data) == 0 {
 		return nil
@@ -211,7 +151,8 @@ func fromByteSlice(data []byte) *opencv.IplImage {
 }
 
 // Load as grayscale en resize
-func Load(reader io.Reader, maxSize int) (*opencv.IplImage, int, int, error) {
+func Load(reader io.Reader, maxBytes int64, maxSize int) (*opencv.IplImage, int, int, error) {
+	reader = io.LimitReader(reader, maxBytes)
 	data, err := ioutil.ReadAll(reader)
 	if err != nil {
 		return nil, 0, 0, err
@@ -238,9 +179,37 @@ func Load(reader io.Reader, maxSize int) (*opencv.IplImage, int, int, error) {
 		h = maxSize
 	}
 
+	if w == origWidth && h == origHeight {
+		return src, origWidth, origHeight, nil
+	}
+
 	dst := opencv.Resize(src, w, h, 0)
 
 	return dst, origWidth, origHeight, nil
+}
+
+// LoadBounds loads multiple images from a single image bounded by bounds
+func LoadBounds(reader io.Reader, maxBytes int64, bounds []*image.Rectangle) ([]*opencv.IplImage, error) {
+	img, w, h, err := Load(reader, maxBytes, 800)
+	if err != nil {
+		return nil, err
+	}
+	defer img.Release()
+
+	imgs := make([]*opencv.IplImage, len(bounds))
+	wr := float64(w) / float64(img.Width())
+	hr := float64(h) / float64(img.Height())
+	for i, b := range bounds {
+		imgs[i] = opencv.Crop(
+			img,
+			int(float64(b.Min.X)/wr),
+			int(float64(b.Min.Y)/hr),
+			int(float64(b.Dx())/wr),
+			int(float64(b.Dy())/hr),
+		)
+	}
+
+	return imgs, nil
 }
 
 // Canny the image
