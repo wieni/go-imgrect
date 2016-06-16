@@ -30,21 +30,37 @@ func init() {
 	errLogger = log.New(os.Stderr, "", log.LstdFlags)
 }
 
-// PercentPoint contains both X, Y and %X, %Y
-type PercentPoint struct {
+// percentPoint contains both X, Y and %X, %Y
+type percentPoint struct {
 	X        int     `json:"x"`
 	Y        int     `json:"y"`
 	PercentX float64 `json:"%x"`
 	PercentY float64 `json:"%y"`
 }
 
-// PercentRectangle like image.Rectangle defines a Min and Max point
-type PercentRectangle struct {
-	Min *PercentPoint `json:"min"`
-	Max *PercentPoint `json:"max"`
+func (p *percentPoint) absoluteX(srcWidth, dstWidth int) int {
+	if p.PercentX == 0 {
+		return int(float64(p.X) / float64(srcWidth) * float64(dstWidth))
+	}
+
+	return int(float64(dstWidth) * p.PercentX)
 }
 
-// toPercentRectangles returns a slice of PercentRectangles
+func (p *percentPoint) absoluteY(srcHeight, dstHeight int) int {
+	if p.PercentY == 0 {
+		return int(float64(p.Y) / float64(srcHeight) * float64(dstHeight))
+	}
+
+	return int(float64(dstHeight) * p.PercentY)
+}
+
+// percentRectangle like image.Rectangle defines a Min and Max point
+type percentRectangle struct {
+	Min *percentPoint `json:"min"`
+	Max *percentPoint `json:"max"`
+}
+
+// toPercentRectangles returns a slice of percentRectangles
 // Percentage is calculated based on srcWidth and srcHeight
 // new X and Y based on dstWidth and dstHeight
 func toPercentRectangles(
@@ -53,8 +69,8 @@ func toPercentRectangles(
 	srcHeight,
 	dstWidth,
 	dstHeight int,
-) []*PercentRectangle {
-	rects := make([]*PercentRectangle, len(r))
+) []*percentRectangle {
+	rects := make([]*percentRectangle, len(r))
 	sw := float64(srcWidth)
 	sh := float64(srcHeight)
 
@@ -64,14 +80,14 @@ func toPercentRectangles(
 		maxxp := float64(r[i].Max.X) / sw
 		maxyp := float64(r[i].Max.Y) / sh
 
-		rects[i] = &PercentRectangle{
-			Min: &PercentPoint{
+		rects[i] = &percentRectangle{
+			Min: &percentPoint{
 				int(float64(dstWidth) * minxp),
 				int(float64(dstHeight) * minyp),
 				minxp,
 				minyp,
 			},
-			Max: &PercentPoint{
+			Max: &percentPoint{
 				int(float64(dstWidth) * maxxp),
 				int(float64(dstHeight) * maxyp),
 				maxxp,
@@ -98,9 +114,25 @@ func (b bounds) Less(i, j int) bool {
 
 func bounded(
 	reader io.Reader,
-	rects []*image.Rectangle,
+	rects []*percentRectangle,
 ) (bounds, error) {
-	imgs, err := canny.LoadBounds(reader, 1024*1024*100, rects)
+	img, w, h, err := canny.Load(reader, 1024*1024*100, 800)
+	rw := img.Width()
+	rh := img.Height()
+
+	_rects := make([]*image.Rectangle, len(rects))
+	for i := range rects {
+		rect := image.Rect(
+			rects[i].Min.absoluteX(w, rw),
+			rects[i].Min.absoluteY(h, rh),
+			rects[i].Max.absoluteX(w, rw),
+			rects[i].Max.absoluteY(h, rh),
+		)
+
+		_rects[i] = &rect
+	}
+
+	imgs, err := canny.CropBounds(img, _rects)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +154,7 @@ func weighted(
 	minWidth,
 	minHeight float64,
 	preview io.Writer,
-) ([]*PercentRectangle, error) {
+) ([]*percentRectangle, error) {
 	if amount < 1 {
 		amount = 1
 	}

@@ -192,18 +192,11 @@ func Load(reader io.Reader, maxBytes int64, maxSize int) (*opencv.IplImage, int,
 	return dst, origWidth, origHeight, nil
 }
 
-// LoadBounds loads multiple images from a single image bounded by bounds
-func LoadBounds(reader io.Reader, maxBytes int64, bounds []*image.Rectangle) ([]*opencv.IplImage, error) {
-	img, w, h, err := Load(reader, maxBytes, 800)
-	if err != nil {
-		return nil, err
-	}
-	defer img.Release()
-
+// CropBounds crops a single image into multiple defined by bounds.
+func CropBounds(img *opencv.IplImage, bounds []*image.Rectangle) ([]*opencv.IplImage, error) {
 	imgs := make([]*opencv.IplImage, len(bounds))
-	wr := float64(w) / float64(img.Width())
-	hr := float64(h) / float64(img.Height())
-	var crop [4]int
+	w := img.Width()
+	h := img.Height()
 
 	for i, b := range bounds {
 		if b.Min.X < 0 ||
@@ -217,11 +210,7 @@ func LoadBounds(reader io.Reader, maxBytes int64, bounds []*image.Rectangle) ([]
 			return nil, ErrInvalidBounds
 		}
 
-		crop[0] = int(float64(b.Min.X) / wr)
-		crop[1] = int(float64(b.Min.Y) / hr)
-		crop[2] = int(float64(b.Dx()) / wr)
-		crop[3] = int(float64(b.Dy()) / hr)
-		imgs[i] = opencv.Crop(img, crop[0], crop[1], crop[2], crop[3])
+		imgs[i] = opencv.Crop(img, b.Min.X, b.Min.Y, b.Dx(), b.Dy())
 	}
 
 	return imgs, nil

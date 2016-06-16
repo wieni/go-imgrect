@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"image"
 	"io"
 	"log"
 	"net/http"
@@ -53,9 +52,9 @@ POST /weighted?preview=0|1
 GET  /bounded?url=<http|https img url>&b0=x1,y1,x2,x2&b1=x1,y1,x2,x2&b<n>=x1,y1,x2,x2
 POST /bounded
          multipart/form-data: file=<file>
-                              b0=<int>,<int>,<int>,<int>
-                              b1=<int>,<int>,<int>,<int>
-                              b<n>=<int>,<int>,<int>,<int>
+                              b0=x1,y1,x2,y2   (float < 1 | int)
+                              b1=x1,y1,x2,y2   (float < 1 | int)
+                              b<n>=x1,y1,x2,y2 (float < 1 | int)
 `)
 	return
 }
@@ -68,7 +67,7 @@ func serveBounded(w http.ResponseWriter, r *http.Request, l *log.Logger) (errSta
 	w.Header().Set("Content-Type", "application/json")
 
 	i := 0
-	rects := make([]*image.Rectangle, 0, 2)
+	rects := make([]*percentRectangle, 0, 2)
 
 	for {
 		rect, err := getBound(r, i)
@@ -137,7 +136,7 @@ func serveRects(w http.ResponseWriter, r *http.Request, l *log.Logger) (errStatu
 		headers.Set("Content-Type", "image/jpeg")
 	}
 
-	var re []*PercentRectangle
+	var re []*percentRectangle
 	re, err = weighted(file, 5, width, height, preview)
 	if err == canny.ErrLoadFailed {
 		errStatus = http.StatusUnsupportedMediaType
@@ -191,22 +190,31 @@ func getFormFloat(r *http.Request, key string, fallback float64) float64 {
 	return intVal
 }
 
-func getBound(r *http.Request, index int) (*image.Rectangle, error) {
+func getBound(r *http.Request, index int) (*percentRectangle, error) {
 	raw := strings.Split(r.FormValue(fmt.Sprintf("b%d", index)), ",")
 	if len(raw) != 4 {
 		return nil, errors.New("Invalid rectangle spec")
 	}
 
 	var ints [4]int
+	var values [4]float64
 	for i := range raw {
-		integ, err := strconv.Atoi(raw[i])
+		val, err := strconv.ParseFloat(raw[i], 64)
+		//integ, err := strconv.Atoi(raw[i])
 		if err != nil {
 			return nil, err
 		}
 
-		ints[i] = integ
+		if val < 1 {
+			values[i] = val
+			continue
+		}
+
+		ints[i] = int(val)
 	}
 
-	rect := image.Rect(ints[0], ints[1], ints[2], ints[3])
-	return &rect, nil
+	return &percentRectangle{
+		Min: &percentPoint{ints[0], ints[1], values[0], values[1]},
+		Max: &percentPoint{ints[2], ints[3], values[2], values[3]},
+	}, nil
 }
