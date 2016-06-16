@@ -32,7 +32,7 @@ func router(r *http.Request, l *log.Logger) (simplehttp.HandleFunc, int) {
 		case "weighted":
 			return serveRects, 0
 		case "bounded":
-			return serveRectsBounded, 0
+			return serveBounded, 0
 		}
 	default:
 		return nil, http.StatusMethodNotAllowed
@@ -92,7 +92,7 @@ func getBound(r *http.Request, index int) (*image.Rectangle, error) {
 	return &rect, nil
 }
 
-func serveRectsBounded(w http.ResponseWriter, r *http.Request, l *log.Logger) (errStatus int, herr error) {
+func serveBounded(w http.ResponseWriter, r *http.Request, l *log.Logger) (errStatus int, herr error) {
 	w.Header().Set("Content-Type", "application/json")
 
 	i := 0
@@ -125,6 +125,11 @@ func serveRectsBounded(w http.ResponseWriter, r *http.Request, l *log.Logger) (e
 	}
 
 	bounds, err := bounded(file, rects)
+	if err == canny.ErrInvalidBounds {
+		errStatus = http.StatusNotAcceptable
+		return
+	}
+
 	if err != nil {
 		herr = err
 		return

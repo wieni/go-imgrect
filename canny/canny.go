@@ -14,6 +14,10 @@ import (
 // by opencv
 var ErrLoadFailed = errors.New("Image failed to load")
 
+// ErrInvalidBounds will be returned if the given bounds do not fully overlap
+// with the given image
+var ErrInvalidBounds = errors.New("Invalid bounds")
+
 // Rectangles is a slice of Rectangles
 type Rectangles []*image.Rectangle
 
@@ -199,14 +203,25 @@ func LoadBounds(reader io.Reader, maxBytes int64, bounds []*image.Rectangle) ([]
 	imgs := make([]*opencv.IplImage, len(bounds))
 	wr := float64(w) / float64(img.Width())
 	hr := float64(h) / float64(img.Height())
+	var crop [4]int
+
 	for i, b := range bounds {
-		imgs[i] = opencv.Crop(
-			img,
-			int(float64(b.Min.X)/wr),
-			int(float64(b.Min.Y)/hr),
-			int(float64(b.Dx())/wr),
-			int(float64(b.Dy())/hr),
-		)
+		if b.Min.X < 0 ||
+			b.Max.X < 0 ||
+			b.Min.Y < 0 ||
+			b.Max.Y < 0 ||
+			b.Min.X > w ||
+			b.Max.X > w ||
+			b.Min.Y > h ||
+			b.Max.Y > h {
+			return nil, ErrInvalidBounds
+		}
+
+		crop[0] = int(float64(b.Min.X) / wr)
+		crop[1] = int(float64(b.Min.Y) / hr)
+		crop[2] = int(float64(b.Dx()) / wr)
+		crop[3] = int(float64(b.Dy()) / hr)
+		imgs[i] = opencv.Crop(img, crop[0], crop[1], crop[2], crop[3])
 	}
 
 	return imgs, nil
