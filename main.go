@@ -1,33 +1,49 @@
 package main
 
 import (
+	"bytes"
 	"flag"
+	"fmt"
 	"image"
 	"image/color"
 	"image/jpeg"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-	"runtime"
 	"sort"
 	"strconv"
 	"time"
 
+	"github.com/golang/freetype"
+	"github.com/golang/freetype/truetype"
+	"github.com/wieni/go-imgrect/asset"
 	"github.com/wieni/go-imgrect/canny"
 	"github.com/wieni/go-tls/simplehttp"
 
 	"github.com/lazywei/go-opencv/opencv"
 )
 
-var (
-	maxCPU    int
-	errLogger *log.Logger
-)
+var rectFont *truetype.Font
 
 func init() {
-	maxCPU = runtime.NumCPU()
-	errLogger = log.New(os.Stderr, "", log.LstdFlags)
+	raw := asset.MustAsset("assets/WorkSans-Regular.ttf")
+	var err error
+	rectFont, err = loadFont(bytes.NewReader(raw))
+	if err != nil {
+		panic(err)
+	}
+}
+
+// LoadFont loads a truetype font
+func loadFont(r io.Reader) (*truetype.Font, error) {
+	rawFont, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+
+	return freetype.ParseFont(rawFont)
 }
 
 // percentPoint contains both X, Y and %X, %Y
@@ -150,6 +166,9 @@ func bounded(
 
 func weighted(
 	reader io.Reader,
+	fontReader io.Reader,
+	fontSize float64,
+	fontText string,
 	amount int,
 	minWidth,
 	minHeight float64,
@@ -157,6 +176,33 @@ func weighted(
 ) ([]*percentRectangle, error) {
 	if amount < 1 {
 		amount = 1
+	}
+
+	var fontCtx *freetype.Context
+	var textWidth float64
+	if fontReader != nil {
+		font, err := loadFont(fontReader)
+		if err != nil {
+			return nil, err
+		}
+
+		fontCtx = freetype.NewContext()
+		fontCtx.SetDPI(72)
+		fontCtx.SetFontSize(fontSize)
+		fontCtx.SetFont(font)
+		fontPos, err := fontCtx.DrawString(fontText, freetype.Pt(0, 0))
+		if err != nil {
+			return nil, err
+		}
+
+		textWidth = float64(fontPos.X.Round())
+		if textWidth > minWidth {
+			minWidth = textWidth
+		}
+
+		if fontSize > minHeight {
+			minHeight = fontSize
+		}
 	}
 
 	_img, origWidth, origHeight, err := canny.Load(reader, 800)
@@ -176,8 +222,9 @@ func weighted(
 		minHeight = float64(origHeight) * minHeight
 	}
 
-	minWidth *= float64(width) / float64(origWidth)
-	minHeight *= float64(height) / float64(origHeight)
+	ratio := float64(width) / float64(origWidth)
+	minWidth *= ratio
+	minHeight *= ratio
 
 	var rects canny.Rectangles
 	var img *opencv.IplImage
@@ -211,7 +258,8 @@ func weighted(
 		), nil
 	}
 
-	goimg := image.NewGray(image.Rect(0, 0, width, height))
+	overlayColor := image.NewUniform(color.NRGBA{A: 255, R: 255})
+	goimg := image.NewNRGBA(image.Rect(0, 0, width, height))
 	for y := 0; y < height; y++ {
 		for x := 0; x < width; x++ {
 			c := _img.Get1D(width*y + x).Val()[0]
@@ -219,17 +267,41 @@ func weighted(
 		}
 	}
 
-	r := 127 / float64(len(rects))
+	if fontCtx != nil && len(rects) != 0 {
+		fontCtx.SetFontSize(fontSize * ratio)
+		fontCtx.SetClip(goimg.Bounds())
+		fontCtx.SetDst(goimg)
+		fontCtx.SetSrc(overlayColor)
+		for _, rect := range rects {
+			fontCtx.DrawString(
+				fontText,
+				freetype.Pt(
+					rect.Min.X+(rect.Dx()/2)-int(textWidth*ratio/2), //rect.Min.X+(rect.Dx()/2)-int(float64(textWidth)*ratio/2),
+					rect.Min.Y+(rect.Dy()/2),                        //-int(float64(fontSize)*ratio/2),
+				),
+			)
+		}
+	}
+
 	for i, rect := range rects {
-		c := color.Gray{127 + uint8(r*float64(i))}
+		s := 10
+		ctx := freetype.NewContext()
+		ctx.SetDPI(72)
+		ctx.SetFontSize(float64(s))
+		ctx.SetFont(rectFont)
+		fontCtx.DrawString(
+			fmt.Sprintf("%d.", i+1),
+			freetype.Pt(rect.Min.X+5, rect.Min.Y+s+10),
+		)
+
 		for x := rect.Min.X; x < rect.Max.X; x++ {
-			goimg.Set(x, rect.Min.Y, c)
-			goimg.Set(x, rect.Max.Y-1, c)
+			goimg.Set(x, rect.Min.Y, overlayColor)
+			goimg.Set(x, rect.Max.Y-1, overlayColor)
 		}
 
 		for y := rect.Min.Y; y < rect.Max.Y; y++ {
-			goimg.Set(rect.Min.X, y, c)
-			goimg.Set(rect.Max.X-1, y, c)
+			goimg.Set(rect.Min.X, y, overlayColor)
+			goimg.Set(rect.Max.X-1, y, overlayColor)
 		}
 	}
 
@@ -262,5 +334,5 @@ func main() {
 	server.SetHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
 	server.SetHeader("Access-Control-Allow-Origin", "*")
 
-	errLogger.Fatal(server.Start(":"+port, false))
+	log.Fatal(server.Start(":"+port, false))
 }

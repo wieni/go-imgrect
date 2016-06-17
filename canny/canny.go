@@ -165,7 +165,6 @@ func Load(reader io.Reader, maxSize int) (*opencv.IplImage, int, int, error) {
 	if src == nil {
 		return nil, 0, 0, ErrLoadFailed
 	}
-	defer src.Release()
 
 	origWidth := src.Width()
 	origHeight := src.Height()
@@ -185,6 +184,7 @@ func Load(reader io.Reader, maxSize int) (*opencv.IplImage, int, int, error) {
 	if w == origWidth && h == origHeight {
 		return src, origWidth, origHeight, nil
 	}
+	defer src.Release()
 
 	dst := opencv.Resize(src, w, h, 0)
 

@@ -91,12 +91,13 @@ func serveBounded(w http.ResponseWriter, r *http.Request, l *log.Logger) (errSta
 		return
 	}
 
-	file, err := getRequestFile(r)
+	file, err := getRequestFile(r, "file", "url")
 	if err != nil {
 		errStatus = http.StatusNotAcceptable
 		herr = err
 		return
 	}
+	defer file.Close()
 
 	bounds, err := bounded(file, rects)
 	if err == canny.ErrInvalidBounds {
@@ -118,12 +119,17 @@ func serveRects(w http.ResponseWriter, r *http.Request, l *log.Logger) (errStatu
 	defer r.Body.Close()
 
 	var file io.ReadCloser
-	file, err = getRequestFile(r)
+	file, err = getRequestFile(r, "file", "url")
 	if err != nil {
 		errStatus = http.StatusNotAcceptable
 		return
 	}
 	defer file.Close()
+
+	font, _ := getRequestFile(r, "font", "fonturl")
+	if font != nil {
+		defer font.Close()
+	}
 
 	width := getFormFloat(r, "w", 1)
 	height := getFormFloat(r, "h", 1)
@@ -139,8 +145,11 @@ func serveRects(w http.ResponseWriter, r *http.Request, l *log.Logger) (errStatu
 		headers.Set("Content-Type", "image/jpeg")
 	}
 
+	fontSize := getFormFloat(r, "fontsize", 0)
+	fontText := r.FormValue("text")
+
 	var re []*percentRectangle
-	re, err = weighted(file, 5, width, height, preview)
+	re, err = weighted(file, font, fontSize, fontText, 5, width, height, preview)
 	if err == canny.ErrLoadFailed {
 		errStatus = http.StatusUnsupportedMediaType
 		return
@@ -153,22 +162,19 @@ func serveRects(w http.ResponseWriter, r *http.Request, l *log.Logger) (errStatu
 	return 0, json.NewEncoder(w).Encode(&response{re})
 }
 
-func getRequestFile(r *http.Request) (file io.ReadCloser, err error) {
+func getRequestFile(r *http.Request, fileField, urlField string) (file io.ReadCloser, err error) {
 	if r.Method == "POST" {
-		file, _, err = r.FormFile("file")
+		file, _, err = r.FormFile(fileField)
 		if err == nil {
 			return
 		}
 	}
 
 	if r.Method == "GET" || err == http.ErrMissingFile {
-		url := r.FormValue("url")
+		url := r.FormValue(urlField)
 		if url == "" {
-			// url = r.URL.Query().Get("url")
-			// if url == "" {
 			err = errors.New("No url")
 			return
-			//}
 		}
 
 		var resp *http.Response
