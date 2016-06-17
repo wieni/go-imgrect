@@ -116,7 +116,7 @@ func bounded(
 	reader io.Reader,
 	rects []*percentRectangle,
 ) (bounds, error) {
-	img, w, h, err := canny.Load(reader, 1024*1024*100, 800)
+	img, w, h, err := canny.Load(reader, 800)
 	rw := img.Width()
 	rh := img.Height()
 
@@ -159,7 +159,7 @@ func weighted(
 		amount = 1
 	}
 
-	_img, origWidth, origHeight, err := canny.Load(reader, 1024*1024*100, 800)
+	_img, origWidth, origHeight, err := canny.Load(reader, 800)
 	if err != nil {
 		return nil, err
 	}

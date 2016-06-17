@@ -155,8 +155,7 @@ func fromByteSlice(data []byte) *opencv.IplImage {
 }
 
 // Load as grayscale en resize
-func Load(reader io.Reader, maxBytes int64, maxSize int) (*opencv.IplImage, int, int, error) {
-	reader = io.LimitReader(reader, maxBytes)
+func Load(reader io.Reader, maxSize int) (*opencv.IplImage, int, int, error) {
 	data, err := ioutil.ReadAll(reader)
 	if err != nil {
 		return nil, 0, 0, err

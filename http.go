@@ -64,6 +64,9 @@ func serveOption(w http.ResponseWriter, r *http.Request, l *log.Logger) (errStat
 }
 
 func serveBounded(w http.ResponseWriter, r *http.Request, l *log.Logger) (errStatus int, herr error) {
+	maxFormSize := int64(60 << 20)
+	r.Body = http.MaxBytesReader(w, r.Body, maxFormSize)
+	defer r.Body.Close()
 	w.Header().Set("Content-Type", "application/json")
 
 	i := 0
