@@ -25,7 +25,10 @@ import (
 	"github.com/lazywei/go-opencv/opencv"
 )
 
-var rectFont *truetype.Font
+var (
+	rectFont *truetype.Font
+	helpText []byte
+)
 
 func init() {
 	raw := asset.MustAsset("assets/WorkSans-Regular.ttf")
@@ -34,6 +37,8 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
+	helpText = asset.MustAsset("assets/help.txt")
 }
 
 // LoadFont loads a truetype font

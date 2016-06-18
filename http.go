@@ -42,20 +42,7 @@ func router(r *http.Request, l *log.Logger) (simplehttp.HandleFunc, int) {
 
 func serveHelp(w http.ResponseWriter, r *http.Request, l *log.Logger) (errStatus int, err error) {
 	w.Header().Set("Content-Type", "text/plain")
-	fmt.Fprint(w, `
-GET  /weighted?url=<http|https img url>&preview=0|1&w=0.2&h=200
-POST /weighted?preview=0|1
-         multipart/form-data: file=<file>
-                              w=<float<1 | int>
-                              h=<float<1 | int>
-
-GET  /bounded?url=<http|https img url>&b0=x1,y1,x2,x2&b1=x1,y1,x2,x2&b<n>=x1,y1,x2,x2
-POST /bounded
-         multipart/form-data: file=<file>
-                              b0=x1,y1,x2,y2   (float < 1 | int)
-                              b1=x1,y1,x2,y2   (float < 1 | int)
-                              b<n>=x1,y1,x2,y2 (float < 1 | int)
-`)
+	w.Write(helpText)
 	return
 }
 
