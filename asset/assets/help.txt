@@ -3,9 +3,9 @@ POST /weighted?preview=0|1
          multipart/form-data: file=<file>
                               w=<float<1 | int>
                               h=<float<1 | int>
-							  font=<file>
-							  fontsize=<int>
-							  text=<string>
+                              font=<file>
+                              fontsize=<int>
+                              text=<string>
 
 GET  /bounded?url=<http|https img url>&b0=x1,y1,x2,x2&b1=x1,y1,x2,x2&b<n>=x1,y1,x2,x2
 POST /bounded
