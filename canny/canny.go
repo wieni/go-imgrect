@@ -173,11 +173,11 @@ func Load(reader io.Reader, maxSize int) (*opencv.IplImage, int, int, error) {
 	r := float64(w) / float64(h)
 	if w > maxSize {
 		w = maxSize
-		h = int(float64(maxSize) / r)
+		h = maxInt(1, int(float64(maxSize)/r))
 	}
 
 	if h > maxSize {
-		w = int(float64(maxSize) * r)
+		w = maxInt(1, int(float64(maxSize)*r))
 		h = maxSize
 	}
 
@@ -222,8 +222,10 @@ func Canny(src *opencv.IplImage, threshold, ratio float64, clone bool) *opencv.I
 		dst = src.Clone()
 	}
 
-	blur := minInt(src.Width(), src.Height()) / 20
-	opencv.Smooth(dst, dst, opencv.CV_BLUR, blur, blur, 0, 0)
+	if blur := minInt(src.Width(), src.Height()) / 20; blur != 0 {
+		opencv.Smooth(dst, dst, opencv.CV_BLUR, blur, blur, 0, 0)
+	}
+
 	opencv.Canny(dst, dst, threshold, threshold*ratio, 3)
 
 	return dst

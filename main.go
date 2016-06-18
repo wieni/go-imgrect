@@ -25,6 +25,8 @@ import (
 	"github.com/lazywei/go-opencv/opencv"
 )
 
+const maxImageSize = 800
+
 var (
 	rectFont *truetype.Font
 	helpText []byte
@@ -137,7 +139,7 @@ func bounded(
 	reader io.Reader,
 	rects []*percentRectangle,
 ) (bounds, error) {
-	img, w, h, err := canny.Load(reader, 800)
+	img, w, h, err := canny.Load(reader, maxImageSize)
 	rw := img.Width()
 	rh := img.Height()
 
@@ -210,7 +212,7 @@ func weighted(
 		}
 	}
 
-	_img, origWidth, origHeight, err := canny.Load(reader, 800)
+	_img, origWidth, origHeight, err := canny.Load(reader, maxImageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +236,7 @@ func weighted(
 	var rects canny.Rectangles
 	var img *opencv.IplImage
 
-	for threshold := 3.0; threshold < 36; threshold += 3 {
+	for threshold := 0.0; threshold < 20; threshold += 3 {
 		img = canny.Canny(_img, threshold, 3, true)
 		defer img.Release()
 
