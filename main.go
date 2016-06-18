@@ -289,12 +289,15 @@ func weighted(
 	}
 
 	for i, rect := range rects {
-		s := 10
+		s := 20
 		ctx := freetype.NewContext()
 		ctx.SetDPI(72)
+		ctx.SetClip(goimg.Bounds())
 		ctx.SetFontSize(float64(s))
 		ctx.SetFont(rectFont)
-		fontCtx.DrawString(
+		ctx.SetDst(goimg)
+		ctx.SetSrc(overlayColor)
+		ctx.DrawString(
 			fmt.Sprintf("%d.", i+1),
 			freetype.Pt(rect.Min.X+5, rect.Min.Y+s+10),
 		)
