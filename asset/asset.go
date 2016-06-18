@@ -67,9 +67,9 @@ POST /weighted?preview=0|1
          multipart/form-data: file=<file>
                               w=<float<1 | int>
                               h=<float<1 | int>
-							  font=<file>
-							  fontsize=<int>
-							  text=<string>
+                              font=<file>
+                              fontsize=<int>
+                              text=<string>
 
 GET  /bounded?url=<http|https img url>&b0=x1,y1,x2,x2&b1=x1,y1,x2,x2&b<n>=x1,y1,x2,x2
 POST /bounded
@@ -89,7 +89,7 @@ func assetsHelpTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "assets/help.txt", size: 695, mode: os.FileMode(420), modTime: time.Unix(1466254906, 0)}
+	info := bindataFileInfo{name: "assets/help.txt", size: 758, mode: os.FileMode(420), modTime: time.Unix(1466263656, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
