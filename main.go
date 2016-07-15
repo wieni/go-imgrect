@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"image"
@@ -179,6 +180,7 @@ func weighted(
 	amount int,
 	minWidth,
 	minHeight float64,
+	padding [4]int, // top right left bottom
 	preview io.Writer,
 ) ([]*percentRectangle, error) {
 	if amount < 1 {
@@ -233,12 +235,36 @@ func weighted(
 	minWidth *= ratio
 	minHeight *= ratio
 
+	var region *image.Rectangle
+	if [4]int{0, 0, 0, 0} != padding {
+		_region := image.Rect(
+			int(ratio*float64(padding[3])),
+			int(ratio*float64(padding[0])),
+			int(ratio*float64(origWidth-padding[1])),
+			int(ratio*float64(origHeight-padding[2])),
+		)
+		region = &_region
+	}
+
 	var rects canny.Rectangles
 	var img *opencv.IplImage
 
 	for threshold := 0.0; threshold < 20; threshold += 3 {
 		img = canny.Canny(_img, threshold, 3, true)
 		defer img.Release()
+
+		if region != nil {
+			imgs, err := canny.CropBounds(img, []*image.Rectangle{region})
+			if err != nil {
+				return nil, err
+			}
+
+			if len(imgs) != 1 {
+				return nil, errors.New("Invalid amount of images returned from crop")
+			}
+
+			img = imgs[0]
+		}
 
 		_rects := canny.FindRects(img, int(minWidth), int(minHeight))
 		sort.Sort(_rects)
@@ -247,6 +273,15 @@ func weighted(
 
 		if len(rects) >= amount {
 			break
+		}
+	}
+
+	if region != nil {
+		for i := range rects {
+			rects[i].Min.X += region.Min.X
+			rects[i].Max.X += region.Min.X
+			rects[i].Min.Y += region.Min.Y
+			rects[i].Max.Y += region.Min.Y
 		}
 	}
 

@@ -135,8 +135,15 @@ func serveRects(w http.ResponseWriter, r *http.Request, l *log.Logger) (errStatu
 	fontSize := getFormFloat(r, "fontsize", 0)
 	fontText := r.FormValue("text")
 
+	var region [4]int
+
+	region[0] = getFormInt(r, "pt", 0)
+	region[1] = getFormInt(r, "pr", 0)
+	region[2] = getFormInt(r, "pb", 0)
+	region[3] = getFormInt(r, "pl", 0)
+
 	var re []*percentRectangle
-	re, err = weighted(file, font, fontSize, fontText, 5, width, height, preview)
+	re, err = weighted(file, font, fontSize, fontText, 5, width, height, region, preview)
 	if err == canny.ErrLoadFailed {
 		errStatus = http.StatusUnsupportedMediaType
 		return
@@ -179,6 +186,16 @@ func getRequestFile(r *http.Request, fileField, urlField string) (file io.ReadCl
 func getFormFloat(r *http.Request, key string, fallback float64) float64 {
 	val := r.FormValue(key)
 	intVal, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		intVal = fallback
+	}
+
+	return intVal
+}
+
+func getFormInt(r *http.Request, key string, fallback int) int {
+	val := r.FormValue(key)
+	intVal, err := strconv.Atoi(val)
 	if err != nil {
 		intVal = fallback
 	}

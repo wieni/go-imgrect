@@ -62,12 +62,16 @@ func assetsWorksansRegularTtf() (*asset, error) {
 	return a, nil
 }
 
-var _assetsHelpTxt = []byte(`GET  /weighted?url=<http|https img url>&preview=0|1&w=0.2&h=200&fonturl=<http|https ttf url>&fontsize=30&text=lorem%20ipsum
+var _assetsHelpTxt = []byte(`GET  /weighted?url=<http|https img url>&preview=0|1&w=0.2&h=200&pt=100&pr=50&pb=100&pl=50&fonturl=<http|https ttf url>&fontsize=30&text=lorem%20ipsum
 POST /weighted?preview=0|1
          multipart/form-data: file=<file>
-                              w=<float<1 | int>
-                              h=<float<1 | int>
-                              font=<file>
+                              w=<float<1 | int> // Minimum width of each rectangle in pixels or percentage of imagewidth
+                              h=<float<1 | int> // Minimum height of each rectangle in pixels or percentage of imageheight
+                              pt=<int>          // Padding top in pixels
+                              pr=<int>          // Padding right in pixels
+                              pb=<int>          // Padding bottom in pixels
+                              pl=<int>          // Padding left in pixels
+                              font=<file>       // a ttf font file
                               fontsize=<int>
                               text=<string>
 
@@ -89,7 +93,7 @@ func assetsHelpTxt() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "assets/help.txt", size: 758, mode: os.FileMode(420), modTime: time.Unix(1466263656, 0)}
+	info := bindataFileInfo{name: "assets/help.txt", size: 1255, mode: os.FileMode(420), modTime: time.Unix(1468575947, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
